@@ -189,6 +189,9 @@ for the BeagleBone Black and Raspberry Pi. The [Nerves
 Project](https://github.com/nerves-project/nerves_system_br) has more examples
 and is better maintained.
 
+The [examples](docs/examples.md) document will contain self-contained example
+software update scenarios and their corresponding `fwup.conf` files.
+
 My real world use of `fwup` involves writing the new firmware to a place on the
 Flash that's not in current use and then 'flipping' over to it at the very end.
 The examples tend to reflect that. `fwup` can also be used to overwrite an
@@ -773,3 +776,7 @@ developments under license policy of following terms.
 
 On systems without the function strptime(), a version from Google is
 included that is distributed under the Apache 2.0 license.
+
+The examples pull in Buildroot which is GPLv2+ licensed. The `examples`
+directory is for documentation purposes only and is not required for using
+`fwup`.
