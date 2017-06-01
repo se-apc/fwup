@@ -30,8 +30,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <sodium.h>
-
 #define DECLARE_FUN(FUN) \
     static int FUN ## _validate(struct fun_context *fctx); \
     static int FUN ## _compute_progress(struct fun_context *fctx); \

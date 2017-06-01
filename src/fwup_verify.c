@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sodium.h>
 
 static int check_resource(struct resource_list *list, const char *file_resource_name, struct archive *a, struct archive_entry *ae)
 {
