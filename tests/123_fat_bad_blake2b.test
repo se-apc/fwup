@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Test the SHA-256 check when write files to a FAT file system.
+# Test the Blake2b-256 check when write files to a FAT file system.
 #
 
 . ./common.sh
@@ -37,11 +37,11 @@ EOF
 $FWUP_CREATE -c -f $CONFIG -o $FWFILE
 
 # Now be sneaking and replace the data file with a same-sized imposter
-# Erase references to blake2b so that it's not the Blake2b checksums
+# Erase references to sha256 so that it's not the SHA256 checksums
 # that trigger a mismatch.
 unzip -q $FWFILE -d $UNZIPDIR
 mv $UNZIPDIR/meta.conf $UNZIPDIR/meta.conf.orig
-grep -v blake2b $UNZIPDIR/meta.conf.orig > $UNZIPDIR/meta.conf
+grep -v sha256 $UNZIPDIR/meta.conf.orig > $UNZIPDIR/meta.conf
 rm $UNZIPDIR/meta.conf.orig
 cd $UNZIPDIR
 zip -q $WORK/imposter-good.fw meta.conf data/1K.bin
@@ -49,7 +49,7 @@ cp $TESTFILE_1K_CORRUPT $UNZIPDIR/data/1K.bin
 zip -q $WORK/imposter-bad.fw meta.conf data/1K.bin
 cd -
 
-# Check that imposter w/o blake2b checksums still works
+# Check that imposter w/o sha256 checksums still works
 $FWUP_APPLY -a -d $IMGFILE -i $WORK/imposter-good.fw -t complete
 $FWUP_APPLY -V -i $WORK/imposter-good.fw
 

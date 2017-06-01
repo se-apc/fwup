@@ -49,15 +49,20 @@ static int check_resource(struct resource_list *list, const char *file_resource_
     if ((size_t) archive_length != expected_length)
         ERR_RETURN("Length mismatch for %s", file_resource_name);
 
-    char *expected_hash = cfg_getstr(item->resource, "blake2b-256");
-    if (!expected_hash || strlen(expected_hash) != crypto_generichash_BYTES * 2)
-        ERR_RETURN("invalid blake2b-256 hash for '%s'", file_resource_name);
+    const char *expected_blake2b = cfg_getstr(item->resource, "blake2b-256");
+    const char *expected_sha256 = cfg_getstr(item->resource, "sha256");
+    if (expected_blake2b && strlen(expected_blake2b) != crypto_generichash_BYTES * 2)
+        expected_blake2b = NULL;
+    if (expected_sha256 && strlen(expected_sha256) != crypto_hash_sha256_BYTES * 2)
+        expected_sha256 = NULL;
+    if (!expected_blake2b && !expected_sha256)
+        ERR_RETURN("invalid or missing blake2b-256 and sha256 hashes for '%s'", file_resource_name);
 
-    crypto_generichash_state hash_state;
-    crypto_generichash_init(&hash_state, NULL, 0, crypto_generichash_BYTES);
+    struct fwup_hash_state hash_state;
+    fwup_hash_init(&hash_state);
     size_t length_left = expected_length;
     while (length_left != 0) {
-        char buffer[4096];
+        unsigned char buffer[4096];
 
         size_t to_read = sizeof(buffer);
         if (to_read > length_left)
@@ -67,16 +72,15 @@ static int check_resource(struct resource_list *list, const char *file_resource_
         if (len <= 0)
             ERR_RETURN("Error reading '%s' in archive", archive_entry_pathname(ae));
 
-        crypto_generichash_update(&hash_state, (unsigned char*) buffer, len);
+        fwup_hash_update(&hash_state, buffer, len);
         length_left -= len;
     }
 
-    unsigned char hash[crypto_generichash_BYTES];
-    crypto_generichash_final(&hash_state, hash, sizeof(hash));
-    char hash_str[sizeof(hash) * 2 + 1];
-    bytes_to_hex(hash, hash_str, sizeof(hash));
-    if (memcmp(hash_str, expected_hash, sizeof(hash_str)) != 0)
+    fwup_hash_final(&hash_state);
+    if (expected_blake2b && memcmp(hash_state.blake2b_out_str, expected_blake2b, sizeof(hash_state.blake2b_out_str)) != 0)
         ERR_RETURN("Detected blake2b digest mismatch for %s", file_resource_name);
+    if (expected_sha256 && memcmp(hash_state.sha256_out_str, expected_sha256, sizeof(hash_state.sha256_out_str)) != 0)
+        ERR_RETURN("Detected sha256 digest mismatch for %s", file_resource_name);
 
     return 0;
 }

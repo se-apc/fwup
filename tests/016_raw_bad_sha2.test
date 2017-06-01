@@ -22,19 +22,30 @@ EOF
 $FWUP_CREATE -c -f $CONFIG -o $FWFILE
 
 # Now be sneaking and replace the data file with a same-sized imposter
+# Erase references to blake2b so that it's not the Blake2b checksums
+# that trigger a mismatch.
 unzip -q $FWFILE -d $UNZIPDIR
-cp $TESTFILE_1K_CORRUPT $UNZIPDIR/data/1K.bin
+mv $UNZIPDIR/meta.conf $UNZIPDIR/meta.conf.orig
+grep -v blake2b $UNZIPDIR/meta.conf.orig > $UNZIPDIR/meta.conf
+rm $UNZIPDIR/meta.conf.orig
 cd $UNZIPDIR
-zip -q $WORK/imposter.fw meta.conf data/1K.bin
+zip -q $WORK/imposter-good.fw meta.conf data/1K.bin
+cp $TESTFILE_1K_CORRUPT $UNZIPDIR/data/1K.bin
+zip -q $WORK/imposter-bad.fw meta.conf data/1K.bin
 cd -
-echo Expecting Blake2b mismatch...
-if $FWUP_APPLY -a -d $IMGFILE -i $WORK/imposter.fw -t complete; then
+
+# Check that imposter w/o blake2b checksums still works
+$FWUP_APPLY -a -d $IMGFILE -i $WORK/imposter-good.fw -t complete
+$FWUP_APPLY -V -i $WORK/imposter-good.fw
+
+echo Expecting mismatch during apply...
+if $FWUP_APPLY -a -d $IMGFILE -i $WORK/imposter-bad.fw -t complete; then
     echo "This should have failed"
     exit 1
 fi
 
-echo Expecting Blake2b mismatch during verification...
-if $FWUP_APPLY -V -i $WORK/imposter.fw; then
+echo Expecting mismatch during verification...
+if $FWUP_APPLY -V -i $WORK/imposter-bad.fw; then
     echo "This should have failed"
     exit 1
 fi

@@ -230,9 +230,14 @@ int raw_write_run(struct fun_context *fctx)
     if (!resource)
         ERR_CLEANUP_MSG("raw_write can't find matching file-resource");
 
-    char *expected_hash = cfg_getstr(resource, "blake2b-256");
-    if (!expected_hash || strlen(expected_hash) != crypto_generichash_BYTES * 2)
-        ERR_CLEANUP_MSG("invalid blake2b-256 hash for '%s'", fctx->on_event->title);
+    const char *expected_blake2b = cfg_getstr(resource, "blake2b-256");
+    const char *expected_sha256 = cfg_getstr(resource, "sha256");
+    if (expected_blake2b && strlen(expected_blake2b) != crypto_generichash_BYTES * 2)
+        expected_blake2b = NULL;
+    if (expected_sha256 && strlen(expected_sha256) != crypto_hash_sha256_BYTES * 2)
+        expected_sha256 = NULL;
+    if (!expected_blake2b && !expected_sha256)
+        ERR_CLEANUP_MSG("invalid or missing blake2b-256 and sha256 hashes for '%s'", fctx->on_event->title);
 
     OK_OR_CLEANUP(sparse_file_get_map_from_resource(resource, &sfm));
     off_t expected_length = sparse_file_data_size(&sfm);
@@ -247,8 +252,8 @@ int raw_write_run(struct fun_context *fctx)
     struct block_writer writer;
     OK_OR_CLEANUP(block_writer_init(&writer, fctx->output_fd, 128 * 1024, 9)); // 9 -> 512 byte blocks
 
-    crypto_generichash_state hash_state;
-    crypto_generichash_init(&hash_state, NULL, 0, crypto_generichash_BYTES);
+    struct fwup_hash_state hash_state;
+    fwup_hash_init(&hash_state);
     for (;;) {
         off_t offset;
         size_t len;
@@ -260,7 +265,7 @@ int raw_write_run(struct fun_context *fctx)
         if (len == 0)
             break;
 
-        crypto_generichash_update(&hash_state, (unsigned char*) buffer, len);
+        fwup_hash_update(&hash_state, buffer, len);
 
         ssize_t written = block_writer_pwrite(&writer, buffer, len, dest_offset + offset);
         if (written < 0)
@@ -300,12 +305,11 @@ int raw_write_run(struct fun_context *fctx)
     }
 
     // Verify hash
-    unsigned char hash[crypto_generichash_BYTES];
-    crypto_generichash_final(&hash_state, hash, sizeof(hash));
-    char hash_str[sizeof(hash) * 2 + 1];
-    bytes_to_hex(hash, hash_str, sizeof(hash));
-    if (memcmp(hash_str, expected_hash, sizeof(hash_str)) != 0)
-        ERR_CLEANUP_MSG("raw_write detected blake2b digest mismatch");
+    fwup_hash_final(&hash_state);
+    if (expected_blake2b && memcmp(hash_state.blake2b_out_str, expected_blake2b, sizeof(hash_state.blake2b_out_str)) != 0)
+        ERR_CLEANUP_MSG("Blake2b digest mismatch for '%s'", fctx->on_event->title);
+    if (expected_sha256 && memcmp(hash_state.sha256_out_str, expected_sha256, sizeof(hash_state.sha256_out_str)) != 0)
+        ERR_CLEANUP_MSG("SHA256 digest mismatch for '%s'", fctx->on_event->title);
 
 cleanup:
     sparse_file_free(&sfm);
@@ -486,9 +490,15 @@ int fat_write_run(struct fun_context *fctx)
     cfg_t *resource = cfg_gettsec(fctx->cfg, "file-resource", fctx->on_event->title);
     if (!resource)
         ERR_CLEANUP_MSG("fat_write can't find matching file-resource");
-    char *expected_hash = cfg_getstr(resource, "blake2b-256");
-    if (!expected_hash || strlen(expected_hash) != crypto_generichash_BYTES * 2)
-        ERR_CLEANUP_MSG("invalid blake2b-256 hash for '%s'", fctx->on_event->title);
+
+    const char *expected_blake2b = cfg_getstr(resource, "blake2b-256");
+    const char *expected_sha256 = cfg_getstr(resource, "sha256");
+    if (expected_blake2b && strlen(expected_blake2b) != crypto_generichash_BYTES * 2)
+        expected_blake2b = NULL;
+    if (expected_sha256 && strlen(expected_sha256) != crypto_hash_sha256_BYTES * 2)
+        expected_sha256 = NULL;
+    if (!expected_blake2b && !expected_sha256)
+        ERR_CLEANUP_MSG("invalid or missing blake2b-256 and sha256 hashes for '%s'", fctx->on_event->title);
 
     struct fat_cache *fc;
     off_t len_written = 0;
@@ -511,8 +521,8 @@ int fat_write_run(struct fun_context *fctx)
         goto cleanup;
     }
 
-    crypto_generichash_state hash_state;
-    crypto_generichash_init(&hash_state, NULL, 0, crypto_generichash_BYTES);
+    struct fwup_hash_state hash_state;
+    fwup_hash_init(&hash_state);
     for (;;) {
         off_t offset;
         size_t len;
@@ -524,7 +534,7 @@ int fat_write_run(struct fun_context *fctx)
         if (len == 0)
             break;
 
-        crypto_generichash_update(&hash_state, (unsigned char*) buffer, len);
+        fwup_hash_update(&hash_state, buffer, len);
 
         OK_OR_CLEANUP(fatfs_pwrite(fc, fctx->argv[2], (int) offset, buffer, len));
 
@@ -545,12 +555,11 @@ int fat_write_run(struct fun_context *fctx)
             ERR_CLEANUP_MSG("fat_write didn't write the expected amount");
     }
 
-    unsigned char hash[crypto_generichash_BYTES];
-    crypto_generichash_final(&hash_state, hash, sizeof(hash));
-    char hash_str[sizeof(hash) * 2 + 1];
-    bytes_to_hex(hash, hash_str, sizeof(hash));
-    if (memcmp(hash_str, expected_hash, sizeof(hash_str)) != 0)
-        ERR_CLEANUP_MSG("fat_write detected blake2b hash mismatch");
+    fwup_hash_final(&hash_state);
+    if (expected_blake2b && memcmp(hash_state.blake2b_out_str, expected_blake2b, sizeof(hash_state.blake2b_out_str)) != 0)
+        ERR_CLEANUP_MSG("Blake2b digest mismatch for '%s'", fctx->on_event->title);
+    if (expected_sha256 && memcmp(hash_state.sha256_out_str, expected_sha256, sizeof(hash_state.sha256_out_str)) != 0)
+        ERR_CLEANUP_MSG("SHA256 digest mismatch for '%s'", fctx->on_event->title);
 
 cleanup:
     sparse_file_free(&sfm);
