@@ -48,6 +48,19 @@ struct block_cache_segment {
     uint8_t flags[BLOCK_CACHE_BLOCKS_PER_SEGMENT * 2 / 8];
 };
 
+struct block_cache_stats {
+    uint32_t read_partial;
+    uint32_t read_all;
+    uint32_t pread_call;
+
+    uint32_t async_pwrite;
+    uint32_t sync_pwrite;
+    uint32_t wait_for_write_completion;
+
+    uint32_t cache_hit;
+    uint32_t cache_miss;
+};
+
 struct block_cache {
     int fd;
 
@@ -67,6 +80,9 @@ struct block_cache {
     uint8_t *trimmed;
     bool trimmed_remainder; // true if segments after end of bitfield are trimmed
     bool hw_trim_enabled;
+
+    // Statistics
+    struct block_cache_stats stats;
 
     // Asynchronous writes
 #if USE_PTHREADS

@@ -442,6 +442,15 @@ int fwup_apply(const char *fw_filename,
     fatfs_closefs();
     OK_OR_CLEANUP(block_cache_flush(fctx.output));
 
+    fwup_warnx("block_cache: read_partial=%u", fctx.output->stats.read_partial);
+    fwup_warnx("block_cache: read_all=%u", fctx.output->stats.read_all);
+    fwup_warnx("block_cache: pread_call=%u", fctx.output->stats.pread_call);
+    fwup_warnx("block_cache: async_pwrite=%u", fctx.output->stats.async_pwrite);
+    fwup_warnx("block_cache: sync_pwrite=%u", fctx.output->stats.sync_pwrite);
+    fwup_warnx("block_cache: wait_for_write_completion=%u", fctx.output->stats.wait_for_write_completion);
+    fwup_warnx("block_cache: cache hits=%u", fctx.output->stats.cache_hit);
+    fwup_warnx("block_cache: cache misses=%u", fctx.output->stats.cache_miss);
+
     // Close everything before reporting 100% just in case the OS blocks on the close call.
     block_cache_free(fctx.output);
     free(fctx.output);
